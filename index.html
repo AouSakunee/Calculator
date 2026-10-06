@@ -69,6 +69,29 @@ summary{cursor:pointer;font-weight:700;color:var(--ink)}
 .foot{color:var(--muted);font-size:.85rem;text-align:center}
 @media (prefers-reduced-motion:reduce){.key{transition:none}}
 @media (max-width:360px){.ref{grid-template-columns:repeat(4,1fr)}}
+
+/* Firebase: nickname + shared history */
+.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.who label{font-weight:700}
+.who input{flex:1;min-width:0;font:500 1rem var(--f-ui);padding:8px 12px;border-radius:12px;border:2px solid var(--line);background:var(--key);color:var(--key-ink)}
+.who input:focus-visible{outline:3px solid var(--rose);outline-offset:1px}
+.hist{display:flex;flex-direction:column;gap:10px}
+.hist-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hist h2{margin:0;font-size:1.05rem}
+.status{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.status.live .dot{background:var(--eq-edge)}
+.status.err{color:var(--rose)} .status.err .dot{background:var(--rose)}
+.hist ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hist li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--key)}
+.hist .nm{font-weight:700;color:var(--op-ink);background:var(--op);border-radius:999px;padding:1px 10px;font-size:.82rem;max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist .eqn{font-family:var(--f-num);font-weight:700;color:var(--key-ink);min-width:0;overflow-wrap:anywhere}
+.hist .eqn small{display:block;font:400 .8rem var(--f-ui);color:var(--key-sub)}
+.hist time{font-size:.78rem;color:var(--key-sub);font-variant-numeric:tabular-nums}
+.hist .empty{color:var(--muted);font-size:.92rem}
+@keyframes pop{from{background:var(--fn)}to{background:var(--key)}}
+.hist li.new{animation:pop 1.2s ease-out}
+@media (prefers-reduced-motion:reduce){.hist li.new{animation:none}}
 </style>
 <style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -79,6 +102,11 @@ summary{cursor:pointer;font-weight:700;color:var(--ink)}
     <h1>เครื่องคิดเลขโรมัน</h1>
     <p>พิมพ์เลขโรมันหรือเลขอารบิก แล้วคิดเลขแบบชาวโรมัน</p>
   </header>
+
+  <div class="who">
+    <label for="nick">ชื่อเล่น</label>
+    <input id="nick" maxlength="20" placeholder="พิมพ์ชื่อเล่นก่อนเล่นนะ" autocomplete="off">
+  </div>
 
   <section class="calc" aria-label="เครื่องคิดเลข">
     <div class="brand"><span>CALCVLATOR</span><span>MMXXVI</span></div>
@@ -95,6 +123,14 @@ summary{cursor:pointer;font-weight:700;color:var(--ink)}
       <label class="tog"><input type="checkbox" id="show-hint" checked> แสดงเลขอีกระบบ</label>
     </div>
     <div class="keys" id="keys"></div>
+  </section>
+
+  <section class="hist" aria-label="ประวัติการคำนวณ">
+    <div class="hist-head">
+      <h2>ประวัติล่าสุดของทั้งห้อง</h2>
+      <span class="status" id="db-status"><span class="dot"></span><span id="db-text">กำลังเชื่อมต่อ…</span></span>
+    </div>
+    <ol id="hist-list"><li class="empty" style="display:block;border:0;background:none;padding:0">ยังไม่มีประวัติ ลองกด = สักครั้ง แล้วรายการจะขึ้นที่นี่</li></ol>
   </section>
 
   <details id="ref-box">
@@ -181,6 +217,7 @@ summary{cursor:pointer;font-weight:700;color:var(--ink)}
     if(r.err){clearAll();S.msg=r.err;render();return}
     S.expr=`${fmt(a)} ${op} ${fmt(p.n)} =`;S._ea=a;S._eb=p.n;S._eo=op;
     S.entry=fmt(r.v);S.rem=r.rem;S.acc=null;S.op=null;S.done=true;render();
+    if(window.onCalcDone)window.onCalcDone({a,b:p.n,op,result:r.v,rem:r.rem,mode:S.mode});
   }
   function setMode(m){
     if(m===S.mode)return;
@@ -261,6 +298,65 @@ summary{cursor:pointer;font-weight:700;color:var(--ink)}
   S.expr='XII × III =';S._ea=12;S._eb=3;S._eo='×';S.entry='XXXVI';S.done=true;
   render();
 })();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCjgPUcTucTHBlVZ7LjZIvfZ9L9X0JseUY",
+  authDomain: "roman-calculator-862c7.firebaseapp.com",
+  projectId: "roman-calculator-862c7",
+  storageBucket: "roman-calculator-862c7.firebasestorage.app",
+  messagingSenderId: "270447055827",
+  appId: "1:270447055827:web:6daa2db63b0f5bf8b79526"
+};
+
+const db = getFirestore(initializeApp(firebaseConfig));
+const calcs = collection(db, "calculations");
+
+const VALS=[[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+const toRoman=n=>{let s='';for(const[v,r]of VALS){while(n>=v){s+=r;n-=v}}return s};
+const $=id=>document.getElementById(id);
+const nick=$('nick');
+try{ nick.value=localStorage.getItem('nick')||''; }catch(e){}
+nick.addEventListener('input',()=>{ try{localStorage.setItem('nick',nick.value.trim())}catch(e){} });
+
+function setStatus(kind,text){ const el=$('db-status'); el.className='status '+kind; $('db-text').textContent=text; }
+
+window.onCalcDone = async ({a,b,op,result,rem,mode}) => {
+  const name = nick.value.trim() || 'ไม่ระบุชื่อ';
+  const remR = rem ? ` เศษ ${toRoman(rem)}` : '', remA = rem ? ` เศษ ${rem}` : '';
+  try{
+    await addDoc(calcs, {
+      name,
+      roman: `${toRoman(a)} ${op} ${toRoman(b)} = ${toRoman(result)}${remR}`,
+      arabic: `${a} ${op} ${b} = ${result}${remA}`,
+      a, b, op, result, remainder: rem, mode,
+      createdAt: serverTimestamp()
+    });
+  }catch(err){ console.error(err); setStatus('err','บันทึกไม่สำเร็จ: '+(err.code||err.message)); }
+};
+
+const seen = new Set(); let first = true;
+onSnapshot(query(calcs, orderBy("createdAt","desc"), limit(10)), snap => {
+  setStatus('live','เชื่อมต่อแล้ว อัปเดตสด');
+  const list=$('hist-list'); list.innerHTML='';
+  if(snap.empty){ const li=document.createElement('li'); li.className='empty'; li.style.cssText='display:block;border:0;background:none;padding:0'; li.textContent='ยังไม่มีประวัติ ลองกด = สักครั้ง แล้วรายการจะขึ้นที่นี่'; list.appendChild(li); }
+  snap.forEach(doc=>{
+    const d=doc.data(); const li=document.createElement('li');
+    if(!first && !seen.has(doc.id)) li.classList.add('new');
+    seen.add(doc.id);
+    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=d.name||'ไม่ระบุชื่อ';
+    const eq=document.createElement('span'); eq.className='eqn'; eq.textContent=d.roman||'';
+    const sm=document.createElement('small'); sm.textContent=d.arabic||''; eq.appendChild(sm);
+    const t=document.createElement('time');
+    const dt=d.createdAt?.toDate?.(); t.textContent = dt ? dt.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : 'เมื่อกี้';
+    li.append(nm,eq,t); list.appendChild(li);
+  });
+  first=false;
+}, err => { console.error(err); setStatus('err','เชื่อมต่อไม่ได้: '+(err.code||err.message)); });
 </script>
 </body>
 </html>

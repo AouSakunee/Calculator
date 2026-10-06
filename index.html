@@ -1,1 +1,260 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>เครื่องคิดเลขโรมัน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Sarabun:wght@400;500;700&display=swap">
+<style>
+/* Layout: one retro desk calculator centred on the page; a quiet reference table folds out beneath it */
+:root{
+  --page:#EDE3D1; --ink:#3A2A1E; --muted:#7A6450; --line:#D6C7AE;
+  --body:#6B4A32; --bezel:#4A3222; --lcd:#D9D4B0; --lcd-ink:#2D2B1C; --lcd-dim:#6E6A4C;
+  --key:#F3EAD7; --key-ink:#3B2A1E; --key-edge:#C9B795;
+  --brick:#A8432F; --brick-edge:#7A2E1F; --brass:#C49A45; --cream:#FBF5E8;
+  --f-num:"Cinzel", "Trajan Pro", Georgia, serif;
+  --f-ui:"Sarabun", "Leelawadee UI", "Thonburi", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#1D1814;--ink:#EADFCB;--muted:#B09A80;--line:#3A2F26;color-scheme:dark}}
+:root[data-theme="dark"]{--page:#1D1814;--ink:#EADFCB;--muted:#B09A80;--line:#3A2F26;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font-family:var(--f-ui);font-size:16px;line-height:1.5}
+.wrap{max-width:400px;margin:0 auto;padding:28px 16px 40px;display:flex;flex-direction:column;gap:20px}
+header h1{font-family:var(--f-num);font-weight:700;font-size:1.5rem;letter-spacing:.06em;margin:0;text-wrap:balance}
+header p{margin:2px 0 0;color:var(--muted);font-size:.95rem}
 
+.calc{background:var(--body);border-radius:22px;padding:18px 16px 20px;box-shadow:0 2px 0 var(--bezel),0 14px 30px rgba(40,25,15,.25);display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;justify-content:space-between;align-items:center;color:var(--brass);font-family:var(--f-num);font-size:.78rem;letter-spacing:.22em}
+.lcd{background:var(--lcd);color:var(--lcd-ink);border-radius:10px;border:4px solid var(--bezel);padding:10px 14px 8px;min-height:128px;display:flex;flex-direction:column;justify-content:space-between;gap:2px}
+.expr{font-family:var(--f-num);font-size:.95rem;color:var(--lcd-dim);text-align:right;min-height:1.4em;overflow-wrap:anywhere}
+.main{font-family:var(--f-num);font-weight:700;font-size:2.4rem;line-height:1.15;text-align:right;overflow-wrap:anywhere;min-height:1.15em}
+.main.long{font-size:1.7rem}
+.rem{font-family:var(--f-ui);font-size:1rem;font-weight:500;color:var(--brick)}
+.hint{font-family:var(--f-ui);font-size:.9rem;text-align:right;color:var(--lcd-dim);min-height:1.4em}
+.hint .num{font-family:var(--f-num);font-weight:700;color:var(--lcd-ink)}
+.hint.err{color:var(--brick);font-weight:500;text-align:left}
+
+.controls{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.seg{display:flex;background:var(--bezel);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--key-edge);font:500 .9rem var(--f-ui);padding:5px 12px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brass);color:var(--bezel)}
+.tog{display:flex;align-items:center;gap:6px;color:var(--key-edge);font-size:.85rem;cursor:pointer;user-select:none}
+.tog input{accent-color:var(--brass);width:16px;height:16px}
+
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.key{border:0;border-radius:12px;min-height:58px;font:700 1.35rem var(--f-num);background:var(--key);color:var(--key-ink);box-shadow:0 4px 0 var(--key-edge);cursor:pointer;transition:transform .05s,box-shadow .05s;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.key small{font:500 .68rem var(--f-ui);color:var(--muted);margin-top:3px}
+.key.op{background:var(--brick);color:var(--cream);box-shadow:0 4px 0 var(--brick-edge);font-family:var(--f-ui);font-size:1.5rem}
+.key.fn{background:var(--brass);color:var(--bezel);box-shadow:0 4px 0 #8E6C2C;font:700 1rem var(--f-ui)}
+.key.eq{background:var(--bezel);color:var(--brass);box-shadow:0 4px 0 #2E1F15;font-family:var(--f-ui);font-size:1.6rem}
+.key:active,.key.pressed{transform:translateY(3px);box-shadow:0 1px 0 var(--key-edge)}
+.key.op:active,.key.op.pressed{box-shadow:0 1px 0 var(--brick-edge)}
+.key:focus-visible,.seg button:focus-visible,summary:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:700;color:var(--ink)}
+.ref{margin-top:12px;display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.ref div{display:flex;flex-direction:column;gap:2px;padding:8px 0;border:1px solid var(--line);border-radius:8px}
+.ref b{font-family:var(--f-num);font-size:1.2rem}
+.ref span{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.rules{margin:12px 0 0;padding-left:1.2em;color:var(--muted);font-size:.92rem;display:grid;gap:4px}
+.rules b{font-family:var(--f-num);color:var(--ink)}
+.foot{color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:reduce){.key{transition:none}}
+@media (max-width:360px){.ref{grid-template-columns:repeat(4,1fr)}}
+</style>
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>เครื่องคิดเลขโรมัน</h1>
+    <p>พิมพ์เลขโรมันหรือเลขอารบิก แล้วคิดเลขแบบชาวโรมัน</p>
+  </header>
+
+  <section class="calc" aria-label="เครื่องคิดเลข">
+    <div class="brand"><span>CALCVLATOR</span><span>MMXXVI</span></div>
+    <div class="lcd" role="status" aria-live="polite">
+      <div class="expr" id="expr"></div>
+      <div class="main" id="main"></div>
+      <div class="hint" id="hint"></div>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="เลือกชุดตัวเลข">
+        <button id="m-roman" type="button" aria-pressed="true">เลขโรมัน</button>
+        <button id="m-arabic" type="button" aria-pressed="false">เลขอารบิก</button>
+      </div>
+      <label class="tog"><input type="checkbox" id="show-hint" checked> แสดงเลขอีกระบบ</label>
+    </div>
+    <div class="keys" id="keys"></div>
+  </section>
+
+  <details id="ref-box">
+    <summary>ตารางช่วยจำ</summary>
+    <div class="ref">
+      <div><b>I</b><span>1</span></div><div><b>V</b><span>5</span></div><div><b>X</b><span>10</span></div>
+      <div><b>L</b><span>50</span></div><div><b>C</b><span>100</span></div><div><b>D</b><span>500</span></div>
+      <div><b>M</b><span>1000</span></div>
+    </div>
+    <ul class="rules">
+      <li>ตัวใหญ่อยู่หน้า ให้บวก: <b>VI</b> = 5 + 1 = 6</li>
+      <li>ตัวเล็กอยู่หน้า ให้ลบ: <b>IV</b> = 5 − 1 = 4, <b>IX</b> = 9</li>
+      <li>ซ้ำตัวเดิมได้ไม่เกิน 3 ครั้ง: <b>III</b> = 3 แต่ 4 ต้องเขียน <b>IV</b></li>
+      <li>เลขโรมันไม่มีศูนย์ ไม่มีติดลบ และใหญ่สุดคือ <b>MMMCMXCIX</b> = 3,999</li>
+    </ul>
+  </details>
+
+  <p class="foot">พิมพ์จากคีย์บอร์ดได้ด้วย: I V X L C D M หรือ 0–9, + − * /, Enter, Backspace</p>
+</div>
+
+<script>
+(function(){
+  const VALS=[[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  const SYM={I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+  const CANON=/^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
+  const toRoman=n=>{let s='';for(const[v,r]of VALS){while(n>=v){s+=r;n-=v}}return s};
+  const lenient=s=>{let t=0;for(let i=0;i<s.length;i++){const a=SYM[s[i]],b=SYM[s[i+1]]||0;t+=a<b?-a:a}return t};
+  const fmtAr=n=>n.toLocaleString('en-US');
+
+  const S={mode:'roman',acc:null,op:null,entry:'',done:false,rem:0,expr:'',msg:'',hint:true};
+  const $=id=>document.getElementById(id);
+  const fmt=(n,m=S.mode)=>m==='roman'?toRoman(n):fmtAr(n);
+  const other=n=>S.mode==='roman'?fmtAr(n):toRoman(n);
+
+  function parse(str,m=S.mode){
+    if(str==='')return {ok:false,empty:true};
+    if(m==='arabic'){const n=parseInt(str,10);return n>=1&&n<=3999?{ok:true,n}:{ok:false,n,range:true}}
+    if(CANON.test(str))return {ok:true,n:lenient(str)};
+    return {ok:false,bad:true,guess:lenient(str)};
+  }
+  function badMsg(p,str){
+    if(p.range)return p.n<1?'ชาวโรมันไม่มีเลขศูนย์นะ เริ่มที่ 1':'เลขโรมันไปได้สูงสุดแค่ 3,999 (MMMCMXCIX)';
+    if(p.guess>=1&&p.guess<=3999&&toRoman(p.guess)!==str)return `“${str}” ยังเขียนไม่ถูก เลข ${fmtAr(p.guess)} เขียนว่า ${toRoman(p.guess)}`;
+    return `“${str}” ยังไม่ใช่เลขโรมันที่ถูกต้อง ลองเปิดตารางช่วยจำดูนะ`;
+  }
+
+  function compute(a,op,b){
+    let v,rem=0;
+    if(op==='+')v=a+b; else if(op==='−')v=a-b; else if(op==='×')v=a*b;
+    else{v=Math.floor(a/b);rem=a%b}
+    if(v<1){
+      if(op==='÷')return {err:'หารแล้วได้น้อยกว่า 1 ซึ่งเลขโรมันเขียนไม่ได้'};
+      return {err:v===0?'ได้ผลเป็นศูนย์ แต่ชาวโรมันไม่มีเลขศูนย์!':'ได้ผลติดลบ แต่เลขโรมันไม่มีเลขติดลบ'};
+    }
+    if(v>3999)return {err:`ได้ ${fmtAr(v)} ซึ่งเกิน 3,999 เลขโรมันเขียนไม่ได้`};
+    return {v,rem};
+  }
+
+  function clearAll(){Object.assign(S,{acc:null,op:null,entry:'',done:false,rem:0,expr:'',msg:''})}
+
+  function symbol(s){
+    if(S.done){S.entry='';S.expr='';S.rem=0;S.done=false}
+    S.msg='';
+    if(S.mode==='arabic'){if(S.entry==='0')S.entry='';if(S.entry.length>=4)return}
+    else if(S.entry.length>=15)return;
+    S.entry+=s;render();
+  }
+  function back(){if(S.done){clearAll()}else{S.entry=S.entry.slice(0,-1);S.msg=''}render()}
+  function opPress(o){
+    S.msg='';
+    if(S.entry===''){if(S.acc!==null){S.op=o;S.expr=`${fmt(S.acc)} ${o}`}render();return}
+    const p=parse(S.entry);
+    if(!p.ok){S.msg=badMsg(p,S.entry);render();return}
+    let base=p.n;
+    if(S.acc!==null&&S.op){const r=compute(S.acc,S.op,p.n);if(r.err){clearAll();S.msg=r.err;render();return}base=r.v}
+    S.acc=base;S.op=o;S.entry='';S.rem=0;S.done=false;S.expr=`${fmt(base)} ${o}`;render();
+  }
+  function equals(){
+    S.msg='';
+    if(S.op===null||S.entry===''){render();return}
+    const p=parse(S.entry);
+    if(!p.ok){S.msg=badMsg(p,S.entry);render();return}
+    const a=S.acc,op=S.op,r=compute(a,op,p.n);
+    if(r.err){clearAll();S.msg=r.err;render();return}
+    S.expr=`${fmt(a)} ${op} ${fmt(p.n)} =`;S._ea=a;S._eb=p.n;S._eo=op;
+    S.entry=fmt(r.v);S.rem=r.rem;S.acc=null;S.op=null;S.done=true;render();
+  }
+  function setMode(m){
+    if(m===S.mode)return;
+    const p=parse(S.entry);const old=S.mode;S.mode=m;
+    S.entry=p.ok?fmt(p.n):'';
+    if(S.done&&S._eo)S.expr=`${fmt(S._ea)} ${S._eo} ${fmt(S._eb)} =`;
+    else if(S.acc!==null)S.expr=`${fmt(S.acc)} ${S.op}`;
+    S.msg='';buildKeys();render();
+  }
+
+  function render(){
+    $('expr').textContent=S.expr;
+    const main=$('main');
+    main.textContent=S.entry||(S.acc===null&&!S.msg?(S.mode==='roman'?'—':'0'):'');
+    if(S.done&&S.rem>0){const r=document.createElement('span');r.className='rem';r.textContent=` เศษ ${fmt(S.rem)}`;main.appendChild(r)}
+    main.classList.toggle('long',S.entry.length>9);
+    const h=$('hint');h.className='hint';h.textContent='';
+    if(S.msg){h.classList.add('err');h.textContent=S.msg}
+    else if(S.hint&&S.entry){
+      const p=parse(S.entry);
+      if(p.ok){h.append('= ');const b=document.createElement('span');b.className='num';b.textContent=other(p.n)+(S.done&&S.rem>0?` เศษ ${other(S.rem)}`:'');h.append(b)}
+      else h.textContent=S.mode==='roman'?'ยังไม่ใช่เลขโรมันที่ถูกต้อง':'';
+    }
+    $('m-roman').setAttribute('aria-pressed',S.mode==='roman');
+    $('m-arabic').setAttribute('aria-pressed',S.mode==='arabic');
+  }
+
+  function key(label,cls,fn,area,sub){
+    const b=document.createElement('button');b.type='button';b.className='key '+cls;
+    b.textContent=label;if(sub){const s=document.createElement('small');s.textContent=sub;b.appendChild(s)}
+    if(area)b.style.gridArea=area;b.dataset.k=label;b.addEventListener('click',fn);return b;
+  }
+  function buildKeys(){
+    const k=$('keys');k.innerHTML='';
+    const top=[key('AC','fn',()=>{clearAll();render()}),key('⌫','fn',back),key('÷','op',()=>opPress('÷')),key('×','op',()=>opPress('×'))];
+    top.forEach(b=>k.appendChild(b));
+    if(S.mode==='roman'){
+      k.style.gridTemplateRows='';
+      [['M',1000],['D',500],['C',100]].forEach(([s,v])=>k.appendChild(key(s,'',()=>symbol(s),null,fmtAr(v))));
+      k.appendChild(key('−','op',()=>opPress('−')));
+      [['L',50],['X',10],['V',5]].forEach(([s,v])=>k.appendChild(key(s,'',()=>symbol(s),null,v)));
+      k.appendChild(key('+','op',()=>opPress('+')));
+      k.appendChild(key('I','',()=>symbol('I'),null,1));
+      k.appendChild(key('=','eq',equals,'span 1 / span 3'));
+    }else{
+      ['7','8','9'].forEach(d=>k.appendChild(key(d,'',()=>symbol(d))));
+      k.appendChild(key('−','op',()=>opPress('−')));
+      ['4','5','6'].forEach(d=>k.appendChild(key(d,'',()=>symbol(d))));
+      k.appendChild(key('+','op',()=>opPress('+')));
+      ['1','2','3'].forEach(d=>k.appendChild(key(d,'',()=>symbol(d))));
+      k.appendChild(key('=','eq',equals,'span 2 / span 1'));
+      k.appendChild(key('0','',()=>symbol('0'),'span 1 / span 3'));
+    }
+  }
+  function flash(label){const b=$('keys').querySelector(`[data-k="${label}"]`);if(b){b.classList.add('pressed');setTimeout(()=>b.classList.remove('pressed'),110)}}
+
+  document.addEventListener('keydown',e=>{
+    if(e.metaKey||e.ctrlKey||e.altKey)return;
+    const k=e.key, u=k.toUpperCase();
+    let hit=null;
+    if(S.mode==='roman'&&SYM[u]){symbol(u);hit=u}
+    else if(S.mode==='arabic'&&/^[0-9]$/.test(k)){symbol(k);hit=k}
+    else if(k==='+'){opPress('+');hit='+'}
+    else if(k==='-'){opPress('−');hit='−'}
+    else if(k==='*'||u==='X'&&S.mode==='arabic'){opPress('×');hit='×'}
+    else if(k==='/'){opPress('÷');hit='÷'}
+    else if(k==='Enter'||k==='='){equals();hit='='}
+    else if(k==='Backspace'){back();hit='⌫'}
+    else if(k==='Escape'){clearAll();render();hit='AC'}
+    if(hit){e.preventDefault();flash(hit)}
+  });
+  $('m-roman').addEventListener('click',()=>setMode('roman'));
+  $('m-arabic').addEventListener('click',()=>setMode('arabic'));
+  $('show-hint').addEventListener('change',e=>{S.hint=e.target.checked;render()});
+
+  // Opens on a worked example: XII × III = XXXVI
+  buildKeys();
+  S.expr='XII × III =';S._ea=12;S._eb=3;S._eo='×';S.entry='XXXVI';S.done=true;
+  render();
+})();
+</script>
+</body>
+</html>
